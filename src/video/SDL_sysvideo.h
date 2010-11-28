@@ -427,6 +427,7 @@ extern VideoBootStrap HAIKU_bootstrap;
 extern VideoBootStrap PND_bootstrap;
 extern VideoBootStrap UIKIT_bootstrap;
 extern VideoBootStrap Android_bootstrap;
+extern VideoBootStrap PSL1GHT_bootstrap;
 extern VideoBootStrap PSP_bootstrap;
 extern VideoBootStrap RPI_bootstrap;
 extern VideoBootStrap KMSDRM_bootstrap;
