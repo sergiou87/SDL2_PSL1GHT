@@ -20,6 +20,7 @@
 */
 #include "../SDL_internal.h"
 
+
 /* The high-level video driver subsystem */
 
 #include "SDL.h"
@@ -469,6 +470,8 @@ SDL_VideoInit(const char *driver_name)
     SDL_VideoDevice *video;
     int index;
     int i;
+
+	printf( "SDL_VideoInit");
 
     /* Check to make sure we don't overwrite '_this' */
     if (_this != NULL) {
