@@ -321,6 +321,7 @@
 /* Enable various timer systems */
 #undef SDL_TIMER_HAIKU
 #undef SDL_TIMER_DUMMY
+#undef SDL_TIMER_PSL1GHT
 #undef SDL_TIMER_UNIX
 #undef SDL_TIMER_WINDOWS
 
