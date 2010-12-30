@@ -36,6 +36,15 @@
 #include "psp/SDL_systhread_c.h"
 #elif SDL_THREAD_STDCPP
 #include "stdcpp/SDL_systhread_c.h"
+||||||| constructed merge base
+#elif SDL_THREAD_SPROC
+#include "irix/SDL_systhread_c.h"
+#elif SDL_THREAD_WIN32
+#include "win32/SDL_systhread_c.h"
+#elif SDL_THREAD_NDS
+#include "nds/SDL_systhread_c.h"
+#elif SDL_THREAD_PSL1GHT
+#include "psl1ght/SDL_systhread_c.h"
 #else
 #error Need thread implementation for this platform
 #include "generic/SDL_systhread_c.h"
