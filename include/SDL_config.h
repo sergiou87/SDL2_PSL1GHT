@@ -41,6 +41,8 @@
 #include "SDL_config_android.h"
 #elif defined(__PSP__)
 #include "SDL_config_psp.h"
+#elif defined(__PSL1GHT__)
+#include "SDL_config_PSL1GHT.h"
 #elif defined(__OS2__)
 #include "SDL_config_os2.h"
 #else
