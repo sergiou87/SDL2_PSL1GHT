@@ -1070,10 +1070,6 @@ case $basic_machine in
 	ppc64le-* | powerpc64little-*)
 		basic_machine=powerpc64le-`echo $basic_machine | sed 's/^[^-]*-//'`
 		;;
-	ppu*)
-		basic_machine=powerpc64-unknown
-		os=-psl1ght
-       ;;
 	ps2)
 		basic_machine=i386-ibm
 		;;
@@ -1470,8 +1466,6 @@ case $os in
 		;;
 	-linux-dietlibc)
 		os=-linux-dietlibc
-		;;
-	-psl1ght*)
 		;;
 	-linux*)
 		os=`echo $os | sed -e 's|linux|linux-gnu|'`
