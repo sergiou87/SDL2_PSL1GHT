@@ -150,6 +150,7 @@
 #define SDL_TIMER_PSL1GHT 1
 
 #define SDL_VIDEO_DRIVER_PSL1GHT 1
+#define SDL_VIDEO_RENDER_PSL1GHT 1
 
 /* Enable assembly routines */
 #define SDL_ASSEMBLY_ROUTINES 1
