@@ -19,7 +19,7 @@
     Sam Lantinga
     slouken@libsdl.org
 */
-#include "SDL_config.h"
+#include "../../SDL_internal.h"
 
 #ifdef SDL_TIMER_PSL1GHT
 #include <sys/time.h>
@@ -30,80 +30,55 @@
 #include "../SDL_timer_c.h"
 
 static struct timeval start;
+static SDL_bool ticks_started = SDL_FALSE;
 
 void
-SDL_StartTicks(void)
+SDL_TicksInit(void)
 {
-    /* Set first ticks value */
+    if (ticks_started) {
+        return;
+    }
+    ticks_started = SDL_TRUE;
+
     gettimeofday(&start, NULL);
 }
 
-Uint32
-SDL_GetTicks(void)
+void
+SDL_TicksQuit(void)
 {
-    Uint32 ticks;
+    ticks_started = SDL_FALSE;
+}
+
+Uint32 SDL_GetTicks(void)
+{
+    if (!ticks_started) {
+        SDL_TicksInit();
+    }
+
     struct timeval now;
+    Uint32 ticks;
+
     gettimeofday(&now, NULL);
-    ticks =
-        (now.tv_sec - start.tv_sec) * 1000 + (now.tv_usec -
-                                              start.tv_usec) / 1000;
-    return (ticks);
+    ticks=(now.tv_sec-start.tv_sec)*1000+(now.tv_usec-start.tv_usec)/1000;
+    return(ticks);
+}
+
+Uint64
+SDL_GetPerformanceCounter(void)
+{
+    return SDL_GetTicks();
+}
+
+Uint64
+SDL_GetPerformanceFrequency(void)
+{
+    return 1000;
 }
 
 void
 SDL_Delay(Uint32 ms)
 {
     usleep(ms * 1000);
-}
-
-/* Data to handle a single periodic alarm */
-static int timer_alive = 0;
-static SDL_Thread *timer = NULL;
-
-static int
-RunTimer(void *unused)
-{
-    while (timer_alive) {
-        if (SDL_timer_running) {
-            SDL_ThreadedTimerCheck();
-        }
-        SDL_Delay(10);
-    }
-    return (0);
-}
-
-/* This is only called if the event thread is not running */
-int
-SDL_SYS_TimerInit(void)
-{
-    timer_alive = 1;
-    timer = SDL_CreateThread(RunTimer, NULL);
-    if (timer == NULL)
-        return (-1);
-    return (SDL_SetTimerThreaded(1));
-}
-
-void
-SDL_SYS_TimerQuit(void)
-{
-    timer_alive = 0;
-    if (timer) {
-        SDL_WaitThread(timer, NULL);
-        timer = NULL;
-    }
-}
-
-int
-SDL_SYS_StartTimer(void)
-{
-    SDL_SetError("Internal logic error: psl1ght uses threaded timer");
-    return (-1);
-}
-
-void
-SDL_SYS_StopTimer(void)
-{
-    return;
 }
 
 #endif /* SDL_TIMER_PSL1GHT */

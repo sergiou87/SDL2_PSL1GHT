@@ -111,7 +111,7 @@ static const AudioBootStrap *const bootstrap[] = {
     &DUMMYAUDIO_bootstrap,
 #endif
 #if SDL_AUDIO_DRIVER_PSL1GHT
-    &PSL1GHT_AUD_bootstrap,
+    &PSL1GHTAUDIO_bootstrap,
 #endif
     NULL
 };

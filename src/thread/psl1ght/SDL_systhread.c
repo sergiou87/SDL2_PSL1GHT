@@ -19,7 +19,7 @@
     Sam Lantinga
     slouken@libsdl.org
 */
-#include "SDL_config.h"
+#include "../../SDL_internal.h"
 
 /* PSL1GHT thread management routines for SDL */
 
@@ -60,21 +60,21 @@ SDL_UnmaskSignals(sigset_t * omask)
 }
 
 static void
-RunThread(void *arg)
+RunThread(void *thread)
 {
-    SDL_RunThread(arg);
+    SDL_RunThread(thread);
 	sysThreadExit(0);
 }
 
 int
-SDL_SYS_CreateThread(SDL_Thread * thread, void *args)
+SDL_SYS_CreateThread(SDL_Thread * thread)
 {
 	sys_ppu_thread_t id;
 	size_t stack_size = 0x4000;
 	u64 priority = 1500;
 
     /* Create the thread and go! */
-	int s = sysThreadCreate(&id, RunThread, args, priority, stack_size, THREAD_JOINABLE, "SDL");
+	int s = sysThreadCreate(&id, RunThread, thread, priority, stack_size, THREAD_JOINABLE, "SDL");
     thread->handle = id;
 
     if ( s != 0)
@@ -87,7 +87,7 @@ SDL_SYS_CreateThread(SDL_Thread * thread, void *args)
 }
 
 void
-SDL_SYS_SetupThread(void)
+SDL_SYS_SetupThread(const char *name)
 {
     /* Mask asynchronous signals for this thread */
     SDL_MaskSignals(NULL);
@@ -106,7 +106,33 @@ SDL_SYS_WaitThread(SDL_Thread * thread)
 {
 	u64 retval;
 
-	int t = sysThreadJoin(thread->handle, &retval);
+    sysThreadJoin(thread->handle, &retval);
+}
+
+void SDL_SYS_DetachThread(SDL_Thread *thread)
+{
+    sysThreadDetach(thread->handle);
+}
+
+int SDL_SYS_SetThreadPriority(SDL_ThreadPriority priority)
+{
+    s32 value;
+
+    if (priority == SDL_THREAD_PRIORITY_LOW) {
+        value = 19;
+    } else if (priority == SDL_THREAD_PRIORITY_HIGH) {
+        value = -10;
+    } else if (priority == SDL_THREAD_PRIORITY_TIME_CRITICAL) {
+        value = -20;
+    } else {
+        value = 0;
+    }
+
+    sys_ppu_thread_t id;
+    sysThreadGetId(&id);
+
+    return sysThreadGetPriority(id, &value);
+
 }
 
 /* vi: set ts=4 sw=4 expandtab: */

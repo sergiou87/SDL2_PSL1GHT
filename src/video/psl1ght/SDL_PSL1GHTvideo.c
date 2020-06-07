@@ -19,7 +19,7 @@
     Sam Lantinga
     slouken@libsdl.org
 */
-#include "SDL_config.h"
+#include "../../SDL_internal.h"
 
 /* PSL1GHT SDL video driver implementation (for PS3). Based on Dummy driver.
  *
@@ -36,7 +36,6 @@
 
 #include "SDL_PSL1GHTvideo.h"
 #include "SDL_PSL1GHTevents_c.h"
-#include "SDL_PSL1GHTrender_c.h"
 #include "SDL_PSL1GHTmodes_c.h"
 
 
@@ -65,48 +64,13 @@ PSL1GHT_Available(void)
 static void
 PSL1GHT_DeleteDevice(SDL_VideoDevice * device)
 {
-    deprintf (1, "PSL1GHT_DeleteDevice( %16X)\n", device);
+    deprintf (1, "PSL1GHT_DeleteDevice( %p)\n", device);
     SDL_free(device);
 }
-
-static SDL_VideoDevice *
-PSL1GHT_CreateDevice(int devindex)
-{
-    SDL_VideoDevice *device;
-    deprintf (1, "PSL1GHT_CreateDevice( %16X)\n", devindex);
-
-    /* Initialize all variables that we clean on shutdown */
-    device = (SDL_VideoDevice *) SDL_calloc(1, sizeof(SDL_VideoDevice));
-    if (device) {
-        SDL_memset(device, 0, (sizeof *device));
-    }
-    else {
-        SDL_OutOfMemory();
-        SDL_free(device);
-        return (0);
-    }
-
-    /* Set the function pointers */
-    device->VideoInit = PSL1GHT_VideoInit;
-    device->VideoQuit = PSL1GHT_VideoQuit;
-    device->SetDisplayMode = PSL1GHT_SetDisplayMode;
-    device->GetDisplayModes = PSL1GHT_GetDisplayModes;
-    device->PumpEvents = PSL1GHT_PumpEvents;
-
-    device->free = PSL1GHT_DeleteDevice;
-
-    return device;
-}
-
-VideoBootStrap PSL1GHT_bootstrap = {
-    PSL1GHTVID_DRIVER_NAME, "SDL psl1ght video driver",
-    PSL1GHT_Available, PSL1GHT_CreateDevice
-};
 
 int
 PSL1GHT_VideoInit(_THIS)
 {
-    SDL_DisplayMode mode;
     SDL_DeviceData *devdata = NULL;
 
     devdata = (SDL_DeviceData*) SDL_calloc(1, sizeof(SDL_DeviceData));
@@ -122,9 +86,6 @@ PSL1GHT_VideoInit(_THIS)
 
     initializeGPU(devdata);
     PSL1GHT_InitModes(_this);
-
-    SDL_AddRenderDriver(&_this->displays[0], &SDL_PSL1GHT_RenderDriver);
-
 
     gcmSetFlipMode(GCM_FLIP_VSYNC); // Wait for VSYNC to flip
 
@@ -153,5 +114,150 @@ void initializeGPU( SDL_DeviceData * devdata)
     devdata->_CommandBuffer = rsxInit(0x10000, 1024*1024, host_addr);
     assert(devdata->_CommandBuffer != NULL);
 }
+
+int
+PSL1GHT_CreateWindow(_THIS, SDL_Window * window)
+{
+    SDL_WindowData *wdata;
+
+    /* Allocate window internal data */
+    wdata = (SDL_WindowData *) SDL_calloc(1, sizeof(SDL_WindowData));
+    if (wdata == NULL) {
+        return SDL_OutOfMemory();
+    }
+
+    /* Setup driver data for this window */
+    window->driverdata = wdata;
+
+    SDL_SetKeyboardFocus(window);
+
+    /* Window has been successfully created */
+    return 0;
+}
+
+int
+PSL1GHT_CreateWindowFrom(_THIS, SDL_Window * window, const void *data)
+{
+    return SDL_Unsupported();
+}
+
+void
+PSL1GHT_SetWindowTitle(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_SetWindowIcon(_THIS, SDL_Window * window, SDL_Surface * icon)
+{
+}
+void
+PSL1GHT_SetWindowPosition(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_SetWindowSize(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_ShowWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_HideWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_RaiseWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_MaximizeWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_MinimizeWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_RestoreWindow(_THIS, SDL_Window * window)
+{
+}
+void
+PSL1GHT_SetWindowGrab(_THIS, SDL_Window * window, SDL_bool grabbed)
+{
+
+}
+void
+PSL1GHT_DestroyWindow(_THIS, SDL_Window * window)
+{
+}
+
+SDL_bool PSL1GHT_HasScreenKeyboardSupport(_THIS)
+{
+    return SDL_FALSE;
+}
+void PSL1GHT_ShowScreenKeyboard(_THIS, SDL_Window *window)
+{
+}
+void PSL1GHT_HideScreenKeyboard(_THIS, SDL_Window *window)
+{
+}
+
+SDL_bool PSL1GHT_IsScreenKeyboardShown(_THIS, SDL_Window *window)
+{
+    return SDL_FALSE;
+}
+
+static SDL_VideoDevice *
+PSL1GHT_CreateDevice(int devindex)
+{
+    SDL_VideoDevice *device;
+    deprintf (1, "PSL1GHT_CreateDevice( %16X)\n", devindex);
+
+    /* Initialize all variables that we clean on shutdown */
+    device = (SDL_VideoDevice *) SDL_calloc(1, sizeof(SDL_VideoDevice));
+    if (device) {
+        SDL_memset(device, 0, (sizeof *device));
+    }
+    else {
+        SDL_OutOfMemory();
+        SDL_free(device);
+        return (0);
+    }
+
+    /* Set the function pointers */
+    device->VideoInit = PSL1GHT_VideoInit;
+    device->VideoQuit = PSL1GHT_VideoQuit;
+    device->GetDisplayModes = PSL1GHT_GetDisplayModes;
+    device->SetDisplayMode = PSL1GHT_SetDisplayMode;
+    device->CreateSDLWindow = PSL1GHT_CreateWindow;
+    device->CreateSDLWindowFrom = PSL1GHT_CreateWindowFrom;
+    device->SetWindowTitle = PSL1GHT_SetWindowTitle;
+    device->SetWindowIcon = PSL1GHT_SetWindowIcon;
+    device->SetWindowPosition = PSL1GHT_SetWindowPosition;
+    device->SetWindowSize = PSL1GHT_SetWindowSize;
+    device->ShowWindow = PSL1GHT_ShowWindow;
+    device->HideWindow = PSL1GHT_HideWindow;
+    device->RaiseWindow = PSL1GHT_RaiseWindow;
+    device->MaximizeWindow = PSL1GHT_MaximizeWindow;
+    device->MinimizeWindow = PSL1GHT_MinimizeWindow;
+    device->RestoreWindow = PSL1GHT_RestoreWindow;
+    device->SetWindowGrab = PSL1GHT_SetWindowGrab;
+    device->DestroyWindow = PSL1GHT_DestroyWindow;
+    device->HasScreenKeyboardSupport = PSL1GHT_HasScreenKeyboardSupport;
+    device->ShowScreenKeyboard = PSL1GHT_ShowScreenKeyboard;
+    device->HideScreenKeyboard = PSL1GHT_HideScreenKeyboard;
+    device->IsScreenKeyboardShown = PSL1GHT_IsScreenKeyboardShown;
+
+    device->PumpEvents = PSL1GHT_PumpEvents;
+
+    device->free = PSL1GHT_DeleteDevice;
+
+    return device;
+}
+
+VideoBootStrap PSL1GHT_bootstrap = {
+    PSL1GHTVID_DRIVER_NAME, "SDL psl1ght video driver",
+    PSL1GHT_Available, PSL1GHT_CreateDevice
+};
 
 /* vi: set ts=4 sw=4 expandtab: */

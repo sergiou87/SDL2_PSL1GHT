@@ -152,6 +152,7 @@ extern SDL_JoystickDriver SDL_DUMMY_JoystickDriver;
 extern SDL_JoystickDriver SDL_EMSCRIPTEN_JoystickDriver;
 extern SDL_JoystickDriver SDL_HAIKU_JoystickDriver;
 extern SDL_JoystickDriver SDL_HIDAPI_JoystickDriver;
+extern SDL_JoystickDriver SDL_PSL1GHT_JoystickDriver;
 extern SDL_JoystickDriver SDL_RAWINPUT_JoystickDriver;
 extern SDL_JoystickDriver SDL_IOS_JoystickDriver;
 extern SDL_JoystickDriver SDL_LINUX_JoystickDriver;

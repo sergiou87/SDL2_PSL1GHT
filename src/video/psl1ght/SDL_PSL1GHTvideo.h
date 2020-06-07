@@ -68,6 +68,12 @@ typedef struct SDL_DisplayModeData
 {
     videoConfiguration vconfig;
 } PSL1GHT_DisplayModeData;
+
+typedef struct SDL_WindowData
+{
+
+} SDL_WindowData;
+
 #endif /* _SDL_PSL1GHTvideo_h */
 
 /* vi: set ts=4 sw=4 expandtab: */

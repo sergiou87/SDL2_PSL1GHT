@@ -43,7 +43,7 @@
 #endif
 
 static int
-PSL1GHT_AUD_OpenDevice(_THIS, const char *devname, int iscapture)
+PSL1GHT_AUD_OpenDevice(_THIS, void *handle, const char *devname, int iscapture)
 {
 	deprintf( "PSL1GHT_AUD_OpenDevice(%08X.%08X, %s, %d)\n", SHW64(this), devname, iscapture);
     SDL_AudioFormat test_format = SDL_FirstAudioFormat(this->spec.format);
@@ -167,7 +167,7 @@ PSL1GHT_AUD_GetDeviceBuf(_THIS)
 	//deprintf( "PSL1GHT_AUD_GetDeviceBuf(%08X.%08X) at %d ms\n", SHW64(this), SDL_GetTicks());
 
     //int playing = _config.readIndex;
-    int playing = *((u64*)(u64)_config.readIndex);
+    // int playing = *((u64*)(u64)_config.readIndex);
     int filling = (_last_filled_buf + 1) % _config.numBlocks;
 	Uint8 * dma_buf = (Uint8 *)(u64)_config.audioDataStart;
 	//deprintf( "\tWriting to buffer %d \n", filling);
@@ -179,13 +179,14 @@ PSL1GHT_AUD_GetDeviceBuf(_THIS)
 
 /* This function waits until it is possible to write a full sound buffer */
 static void
-ALSA_WaitDevice(_THIS)
+PSL1GHT_WaitDevice(_THIS)
 {
     /* We're in blocking mode, so there's nothing to do here */
 	//deprintf( "ALSA_WaitDevice(%08X.%08X)\n", SHW64(this));
 	
 	sys_event_t event;
-	s32 ret = sysEventQueueReceive( _snd_queue, &event, 20 * 1000);
+	//s32 ret = 
+	sysEventQueueReceive( _snd_queue, &event, 20 * 1000);
 	//deprintf( "sysEventQueueReceive: %08X\n", ret);
 }
 
@@ -197,7 +198,7 @@ PSL1GHT_AUD_Init(SDL_AudioDriverImpl * impl)
 	/* Set the function pointers */
 	impl->OpenDevice = PSL1GHT_AUD_OpenDevice;
 	//impl->PlayDevice = PSL1GHT_AUD_PlayDevice;
-    impl->WaitDevice = ALSA_WaitDevice;
+    impl->WaitDevice = PSL1GHT_WaitDevice;
 	impl->CloseDevice = PSL1GHT_AUD_CloseDevice;
 	impl->GetDeviceBuf = PSL1GHT_AUD_GetDeviceBuf;
 
@@ -207,7 +208,7 @@ PSL1GHT_AUD_Init(SDL_AudioDriverImpl * impl)
     return 1;   /* this audio target is available. */
 }
 
-AudioBootStrap PSL1GHT_AUD_bootstrap = {
+AudioBootStrap PSL1GHTAUDIO_bootstrap = {
     "psl1ght", "SDL PSL1GHT audio driver", PSL1GHT_AUD_Init, 0       /*1? */
 };
 

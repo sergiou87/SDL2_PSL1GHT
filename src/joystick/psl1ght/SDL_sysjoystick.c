@@ -47,11 +47,12 @@ struct joystick_hwdata
 };
 
 static SDL_PSL1GHT_JoyData joy_data[MAX_PADS];
+int numberOfJoysticks = 0;
 
-
+void SDL_SYS_JoystickDetect(void);
 
 /* Function to scan the system for joysticks.
- * This function should set SDL_numjoysticks to the number of available
+ * This function should set numberOfJoysticks to the number of available
  * joysticks.  Joystick 0 should be the system default joystick.
  * It should return 0, or -1 on an unrecoverable fatal error.
  */
@@ -59,8 +60,7 @@ int
 SDL_SYS_JoystickInit(void)
 {
 	int iReturn = 0;
-    SDL_numjoysticks = MAX_PADS;
-	padInfo padinfo;
+    numberOfJoysticks = MAX_PADS;
 
 	pdprintf("SDL_SYS_JoystickInit\n");
 
@@ -75,22 +75,34 @@ SDL_SYS_JoystickInit(void)
 			SDL_SetError("SDL_SYS_JoystickInit() : Couldn't initialize PS3 pads");
 		}
 	}
+	
+	SDL_SYS_JoystickDetect();
 
+	return numberOfJoysticks;	
+}
 
-	if( iReturn == 0)
+int
+SDL_SYS_JoystickGetCount(void)
+{
+    return numberOfJoysticks;
+}
+
+void
+SDL_SYS_JoystickDetect(void)
+{
+	padInfo padinfo;
+
+	int iReturn = ioPadGetInfo(&padinfo);
+	pdprintf("\tGot info\n");
+	if( iReturn != 0)
 	{
-		iReturn = ioPadGetInfo(&padinfo);
-		pdprintf("\tGot info\n");
-		if( iReturn != 0)
-		{
-			SDL_SetError("SDL_SYS_JoystickInit() : Couldn't get PS3 pads information ");
-		}
+		SDL_SetError("SDL_SYS_JoystickInit() : Couldn't get PS3 pads information ");
 	}
 
 	if( iReturn == 0)
 	{
 		unsigned int i;
-		SDL_numjoysticks = padinfo.connected;
+		numberOfJoysticks = padinfo.connected;
 
 		for(i = 0; i < padinfo.connected; i++)
 		{
@@ -100,19 +112,48 @@ SDL_SYS_JoystickInit(void)
 			}
 		} 
 	}
-	return SDL_numjoysticks;	
 }
 
 /* Function to get the device-dependent name of a joystick */
 const char *
-SDL_SYS_JoystickName(int index)
+SDL_SYS_JoystickGetDeviceName(int device_index)
 {
 	char * name = NULL;
-	if( index <  SDL_numjoysticks)
-		name = joy_data[index].name;
+	if (device_index < numberOfJoysticks)
+		name = "PS1LIGHT Controller";
 	else
 		SDL_SetError("No joystick available with that index");
     return name;
+}
+
+/* Function to perform the mapping from device index to the instance id for this index */
+SDL_JoystickID
+SDL_SYS_JoystickGetDevicePlayerIndex(int device_index)
+{
+    return device_index;
+}
+
+void
+SDL_SYS_JoystickSetDevicePlayerIndex(int device_index, int player_index)
+{
+	
+}
+
+SDL_JoystickID
+SDL_SYS_JoystickGetDeviceInstanceID(int device_index)
+{
+    return device_index;
+}
+
+SDL_JoystickGUID
+SDL_SYS_JoystickGetDeviceGUID(int device_index)
+{
+    SDL_JoystickGUID guid;
+    /* the GUID is just the first 16 chars of the name for now */
+    const char *name = SDL_SYS_JoystickGetDeviceName( device_index );
+    SDL_zero( guid );
+    SDL_memcpy( &guid, name, SDL_min( sizeof(guid), SDL_strlen( name ) ) );
+    return guid;
 }
 
 /* Function to open a joystick for use.
@@ -121,10 +162,12 @@ SDL_SYS_JoystickName(int index)
    It returns 0, or -1 if there is an error.
  */
 int
-SDL_SYS_JoystickOpen(SDL_Joystick * joystick)
+SDL_SYS_JoystickOpen(SDL_Joystick * joystick, int device_index)
 {
     if (!(joystick->hwdata = SDL_malloc(sizeof(struct joystick_hwdata))))
+    {
         return -1;
+    }
 
 	joystick->naxes = 4;
 	joystick->nhats = 0;
@@ -132,6 +175,12 @@ SDL_SYS_JoystickOpen(SDL_Joystick * joystick)
 	joystick->nbuttons = 16;
 
     return 0;
+}
+
+static int
+SDL_SYS_JoystickRumble(SDL_Joystick * joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble)
+{
+    return SDL_Unsupported();
 }
 
 #define CheckPSL1GHTAxis( btn, bnum) \
@@ -159,8 +208,12 @@ void
 SDL_SYS_JoystickUpdate(SDL_Joystick * joystick)
 {
 	padData new_pad_data;
-	if( ioPadGetData(joystick->index, &new_pad_data) != 0)
+	int joystickIndex = SDL_JoystickGetDeviceIndexFromInstanceID(joystick->instance_id);
+	
+	if (ioPadGetData(joystickIndex, &new_pad_data) != 0)
+	{
 		SDL_SetError("No joystick available with that index");
+	}
 	else if(new_pad_data.len >= 8)
 	{
 		// Update axes
@@ -200,16 +253,38 @@ SDL_SYS_JoystickClose(SDL_Joystick * joystick)
 {
     if (joystick->hwdata)
         SDL_free(joystick->hwdata);
-    return;
 }
 
 /* Function to perform any system-specific joystick related cleanup */
 void
 SDL_SYS_JoystickQuit(void)
 {
-    SDL_numjoysticks = 0;
-    return;
+    numberOfJoysticks = 0;
 }
+
+static SDL_bool
+SDL_SYS_JoystickGetGamepadMapping(int device_index, SDL_GamepadMapping *out)
+{
+	return SDL_FALSE;
+}
+
+SDL_JoystickDriver SDL_PSL1GHT_JoystickDriver =
+{
+    SDL_SYS_JoystickInit,
+    SDL_SYS_JoystickGetCount,
+    SDL_SYS_JoystickDetect,
+    SDL_SYS_JoystickGetDeviceName,
+    SDL_SYS_JoystickGetDevicePlayerIndex,
+    SDL_SYS_JoystickSetDevicePlayerIndex,
+    SDL_SYS_JoystickGetDeviceGUID,
+    SDL_SYS_JoystickGetDeviceInstanceID,
+    SDL_SYS_JoystickOpen,
+    SDL_SYS_JoystickRumble,
+    SDL_SYS_JoystickUpdate,
+    SDL_SYS_JoystickClose,
+    SDL_SYS_JoystickQuit,
+    SDL_SYS_JoystickGetGamepadMapping,
+};
 
 #endif /* SDL_JOYSTICK_PSL1GHT */
 

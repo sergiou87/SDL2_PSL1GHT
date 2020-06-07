@@ -41,8 +41,8 @@ static void eventHandle(u64 status, u64 param, void * userdata) {
     // There should only be one window
     if (_this->num_displays == 1) {
         SDL_VideoDisplay *display = &_this->displays[0];
-        if (display->windows != NULL) {
-            window = display->windows;
+        if (display->fullscreen_window != NULL) {
+            window = display->fullscreen_window;
         }
     }
 

@@ -82,6 +82,9 @@ static SDL_JoystickDriver *SDL_joystick_drivers[] = {
 #ifdef SDL_JOYSTICK_HAIKU
     &SDL_HAIKU_JoystickDriver,
 #endif
+#ifdef SDL_JOYSTICK_PSL1GHT
+    &SDL_PSL1GHT_JoystickDriver,
+#endif
 #ifdef SDL_JOYSTICK_USBHID  /* !!! FIXME: "USBHID" is a generic name, and doubly-confusing with HIDAPI next to it. This is the *BSD interface, rename this. */
     &SDL_BSD_JoystickDriver,
 #endif

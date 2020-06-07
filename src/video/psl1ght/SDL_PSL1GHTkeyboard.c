@@ -151,7 +151,7 @@ static void updateKeys(_THIS, const KbData *Keys)
     int x = 0;
     int numKeys = 0;
     Uint8 newkeystate[SDL_NUM_SCANCODES];
-    Uint8 * keystate = SDL_GetKeyboardState(&numKeys);
+    const Uint8 * keystate = SDL_GetKeyboardState(&numKeys);
     Uint16 unicode;
     SDL_Scancode scancode;
 

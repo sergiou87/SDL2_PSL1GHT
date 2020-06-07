@@ -768,7 +768,6 @@ infodir
 docdir
 oldincludedir
 includedir
-runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -878,6 +877,7 @@ enable_directfb_shared
 enable_video_kmsdrm
 enable_kmsdrm_shared
 enable_video_dummy
+enable_video_psl1ght
 enable_video_opengl
 enable_video_opengles
 enable_video_opengles1
@@ -978,7 +978,6 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
-runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE}'
@@ -1231,15 +1230,6 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
-  -runstatedir | --runstatedir | --runstatedi | --runstated \
-  | --runstate | --runstat | --runsta | --runst | --runs \
-  | --run | --ru | --r)
-    ac_prev=runstatedir ;;
-  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
-  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
-  | --run=* | --ru=* | --r=*)
-    runstatedir=$ac_optarg ;;
-
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1377,7 +1367,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir runstatedir
+		libdir localedir mandir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1530,7 +1520,6 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
-  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1670,6 +1659,7 @@ Optional Features:
   --enable-video-kmsdrm   use KMSDRM video driver [[default=no]]
   --enable-kmsdrm-shared  dynamically load kmsdrm support [[default=yes]]
   --enable-video-dummy    use dummy video driver [[default=yes]]
+  --enable-video-psl1ght  use PSL1GHT video driver [[default=yes]]
   --enable-video-opengl   include OpenGL support [[default=yes]]
   --enable-video-opengles include OpenGL ES support [[default=yes]]
   --enable-video-opengles1
@@ -22194,6 +22184,27 @@ $as_echo "#define SDL_VIDEO_DRIVER_DUMMY 1" >>confdefs.h
     fi
 }
 
+CheckPSL1GHTVideo()
+{
+    # Check whether --enable-video-psl1ght was given.
+if test "${enable_video_psl1ght+set}" = set; then :
+  enableval=$enable_video_psl1ght;
+else
+  enable_video_psl1ght=yes
+fi
+
+    if test x$enable_video_psl1ght = xyes; then
+
+$as_echo "#define SDL_VIDEO_DRIVER_PSL1GHT 1" >>confdefs.h
+
+
+$as_echo "#define SDL_VIDEO_RENDER_PSL1GHT 1" >>confdefs.h
+
+        SOURCES="$SOURCES $srcdir/src/video/psl1ght/*.c $srcdir/src/render/psl1ght/*.c"
+        have_video=yes
+    fi
+}
+
 CheckQNXVideo()
 {
     if test x$enable_video = xyes; then
@@ -22520,6 +22531,19 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL 1" >>confdefs.h
 
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lGL"
         SUMMARY_video="${SUMMARY_video} opengl"
+    fi
+}
+
+CheckPSL1GHTGL()
+{
+    if test x$enable_video = xyes -a x$enable_video_opengl = xyes; then
+
+$as_echo "#define SDL_VIDEO_OPENGL 1" >>confdefs.h
+
+
+$as_echo "#define SDL_VIDEO_RENDER_OGL 1" >>confdefs.h
+
+        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lEGL -lGL -lstdc++ -lm"
     fi
 }
 
@@ -25365,6 +25389,49 @@ $as_echo "#define SDL_TIMER_UNIX 1" >>confdefs.h
 
         if test x$enable_video_metal = xyes -o x$enable_video_vulkan = xyes; then
             EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-weak_framework,QuartzCore -Wl,-weak_framework,Metal"
+        fi
+        ;;
+    powerpc64-ps3-elf)
+        ARCH=psl1ght
+        EXTRA_CFLAGS="$EXTRA_CFLAGS -D__PSL1GHT__ -DHAVE_POW -DHAVE_MMAP=0 -DDEBUG_ERROR"
+        EXTRA_CFLAGS="$EXTRA_CFLAGS -I\"$PSL1GHT/ppu/include\" -mcpu=cell "
+        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lgcm_sys -lrsx -lsysutil -lio -laudio -lrt -llv2"
+        CheckPSL1GHTVideo
+        #CheckDummyAudio
+        #CheckPSL1GHTGL
+
+        # Set up files for the thread library
+        if test x$enable_threads = xyes; then
+            $as_echo "#define SDL_THREAD_PSL1GHT 1" >>confdefs.h
+
+            SOURCES="$SOURCES $srcdir/src/thread/psl1ght/*.c"
+            SOURCES="$SOURCES $srcdir/src/thread/generic/SDL_sysmutex.c"
+            SOURCES="$SOURCES $srcdir/src/thread/generic/SDL_syscond.c"
+            SOURCES="$SOURCES $srcdir/src/thread/generic/SDL_systls.c"
+            have_threads=yes
+        fi
+        # Set up files for the joystick library
+        if test x$enable_joystick = xyes; then
+            $as_echo "#define SDL_JOYSTICK_PSL1GHT 1" >>confdefs.h
+
+            SOURCES="$SOURCES $srcdir/src/joystick/psl1ght/*.c"
+            EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lio"
+            have_joystick=yes
+        fi
+        # Set up files for the timer library
+        if test x$enable_timers = xyes; then
+            $as_echo "#define SDL_TIMER_PSL1GHT 1" >>confdefs.h
+
+            SOURCES="$SOURCES $srcdir/src/timer/psl1ght/*.c"
+            have_timers=yes
+        fi
+        # Set up files for the audio library
+        if test x$enable_audio = xyes; then
+            $as_echo "#define SDL_AUDIO_DRIVER_PSL1GHT 1" >>confdefs.h
+
+            SOURCES="$SOURCES $srcdir/src/audio/psl1ght/*.c"
+            EXTRA_LDFLAGS="$EXTRA_LDFLAGS -laudio"
+            have_audio=yes
         fi
         ;;
     *-nacl|*-pnacl)

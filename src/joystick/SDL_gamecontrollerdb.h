@@ -818,6 +818,9 @@ static const char *s_ControllerMappings [] =
 #if defined(SDL_JOYSTICK_EMSCRIPTEN)
     "default,Standard Gamepad,a:b0,b:b1,back:b8,dpdown:b13,dpleft:b14,dpright:b15,dpup:b12,guide:b16,leftshoulder:b4,leftstick:b10,lefttrigger:b6,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b11,righttrigger:b7,rightx:a2,righty:a3,start:b9,x:b2,y:b3,",
 #endif
+#if defined(SDL_JOYSTICK_PSL1GHT)
+    "5053314c4947485420436f6e74726f6c,PS1LIGHT Controller,a:b9,b:b10,back:b7,dpdown:b1,dpleft:b0,dpright:b2,dpup:b3,leftshoulder:b13,leftstick:b6,lefttrigger:b15,leftx:a0,lefty:a1,rightshoulder:b12,rightstick:b5,righttrigger:b14,rightx:a2,righty:a3,start:b4,x:b8,y:b11,",
+#endif
     "hidapi,*,a:b0,b:b1,back:b4,dpdown:b12,dpleft:b13,dpright:b14,dpup:b11,guide:b5,leftshoulder:b9,leftstick:b7,lefttrigger:a4,leftx:a0,lefty:a1,rightshoulder:b10,rightstick:b8,righttrigger:a5,rightx:a2,righty:a3,start:b6,x:b2,y:b3,",
     NULL
 };

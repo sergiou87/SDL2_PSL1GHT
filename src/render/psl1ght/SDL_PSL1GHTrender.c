@@ -18,7 +18,7 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "SDL_config.h"
+#include "../../SDL_internal.h"
 
 #if SDL_VIDEO_RENDER_PSL1GHT
 
@@ -40,29 +40,42 @@
 /* SDL surface based renderer implementation */
 
 static SDL_Renderer *PSL1GHT_CreateRenderer(SDL_Window * window, Uint32 flags);
+static void PSL1GHT_WindowEvent(SDL_Renderer * renderer, const SDL_WindowEvent *event);
+static SDL_bool PSL1GHT_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode);
 static int PSL1GHT_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
-static int PSL1GHT_SetTextureColorMod(SDL_Renderer * renderer,
-                                 SDL_Texture * texture);
-static int PSL1GHT_SetTextureAlphaMod(SDL_Renderer * renderer,
-                                 SDL_Texture * texture);
-static int PSL1GHT_SetTextureBlendMode(SDL_Renderer * renderer,
-                                  SDL_Texture * texture);
 static int PSL1GHT_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                             const SDL_Rect * rect, const void *pixels,
                             int pitch);
+static int PSL1GHT_UpdateTextureYUV(SDL_Renderer * renderer, SDL_Texture * texture,
+                     const SDL_Rect * rect,
+                     const Uint8 *Yplane, int Ypitch,
+                     const Uint8 *Uplane, int Upitch,
+                     const Uint8 *Vplane, int Vpitch);
 static int PSL1GHT_LockTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                           const SDL_Rect * rect, void **pixels, int *pitch);
 static void PSL1GHT_UnlockTexture(SDL_Renderer * renderer, SDL_Texture * texture);
+static int PSL1GHT_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture);
+static int PSL1GHT_QueueSetViewport(SDL_Renderer * renderer, SDL_RenderCommand *cmd);
+static int PSL1GHT_QueueSetDrawColor(SDL_Renderer * renderer, SDL_RenderCommand *cmd);
+static void PSL1GHT_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_ScaleMode scaleMode);
 static int PSL1GHT_UpdateViewport(SDL_Renderer * renderer);
 static int PSL1GHT_RenderClear(SDL_Renderer * renderer);
+static int PSL1GHT_QueueDrawPoints(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FPoint * points, int count);
 static int PSL1GHT_RenderDrawPoints(SDL_Renderer * renderer,
                                const SDL_Point * points, int count);
 static int PSL1GHT_RenderDrawLines(SDL_Renderer * renderer,
                               const SDL_Point * points, int count);
+static int PSL1GHT_QueueFillRects(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FRect * rects, int count);
 static int PSL1GHT_RenderFillRects(SDL_Renderer * renderer,
                               const SDL_Rect * rects, int count);
+static int PSL1GHT_QueueCopy(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * texture,
+                const SDL_Rect * srcrect, const SDL_FRect * dstrect);
 static int PSL1GHT_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
                          const SDL_Rect * srcrect, const SDL_Rect * dstrect);
+static int PSL1GHT_QueueCopyEx(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * texture,
+                const SDL_Rect * srcquad, const SDL_FRect * dstrect,
+                const double angle, const SDL_FPoint *center, const SDL_RendererFlip flip);
+static int PSL1GHT_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertices, size_t vertsize);
 static int PSL1GHT_RenderReadPixels(SDL_Renderer * renderer, const SDL_Rect * rect,
                                Uint32 format, void * pixels, int pitch);
 static void PSL1GHT_RenderPresent(SDL_Renderer * renderer);
@@ -89,6 +102,13 @@ typedef struct
     void *textures[3];
     gcmContextData *context; // Context to keep track of the RSX buffer.
 } PSL1GHT_RenderData;
+
+typedef struct
+{
+    SDL_Rect    srcRect;
+    SDL_Rect   dstRect;
+} PSL1GHT_CopyData;
+
 
 static void waitFlip()
 {
@@ -173,7 +193,7 @@ PSL1GHT_CreateRenderer(SDL_Window * window, Uint32 flags)
         }
 
         u32 offset = 0;
-        deprintf (1,  "\t\tPrepare RSX offsets (%16X, %08X) \n", (unsigned int) data->screens[i]->pixels, (unsigned int) &offset);
+        deprintf (1,  "\t\tPrepare RSX offsets (%p, %p) \n", data->screens[i]->pixels, &offset);
         if (rsxAddressToOffset(data->screens[i]->pixels, &offset) != 0) {
             deprintf (1, "ERROR\n");
             PSL1GHT_DestroyRenderer(renderer);
@@ -193,30 +213,47 @@ PSL1GHT_CreateRenderer(SDL_Window * window, Uint32 flags)
 
     deprintf (1,  "\tFinished\n");
 
+    renderer->WindowEvent = PSL1GHT_WindowEvent;
+    renderer->SupportsBlendMode = PSL1GHT_SupportsBlendMode;
     renderer->CreateTexture = PSL1GHT_CreateTexture;
-    renderer->SetTextureColorMod = PSL1GHT_SetTextureColorMod;
-    renderer->SetTextureAlphaMod = PSL1GHT_SetTextureAlphaMod;
-    renderer->SetTextureBlendMode = PSL1GHT_SetTextureBlendMode;
     renderer->UpdateTexture = PSL1GHT_UpdateTexture;
+    renderer->UpdateTextureYUV = PSL1GHT_UpdateTextureYUV;
     renderer->LockTexture = PSL1GHT_LockTexture;
     renderer->UnlockTexture = PSL1GHT_UnlockTexture;
-    renderer->UpdateViewport = PSL1GHT_UpdateViewport;
-    renderer->DestroyTexture = PSL1GHT_DestroyTexture;
-    renderer->RenderClear = PSL1GHT_RenderClear;
-    renderer->RenderDrawPoints = PSL1GHT_RenderDrawPoints;
-    renderer->RenderDrawLines = PSL1GHT_RenderDrawLines;
-    renderer->RenderFillRects = PSL1GHT_RenderFillRects;
-    renderer->RenderCopy = PSL1GHT_RenderCopy;
+    renderer->SetTextureScaleMode = PSL1GHT_SetTextureScaleMode;
+    renderer->SetRenderTarget = PSL1GHT_SetRenderTarget;
+    renderer->QueueSetViewport = PSL1GHT_QueueSetViewport;
+    renderer->QueueSetDrawColor = PSL1GHT_QueueSetDrawColor;
+    renderer->QueueDrawPoints = PSL1GHT_QueueDrawPoints;
+    renderer->QueueDrawLines = PSL1GHT_QueueDrawPoints;  // lines and points queue the same way.
+    renderer->QueueFillRects = PSL1GHT_QueueFillRects;
+    renderer->QueueCopy = PSL1GHT_QueueCopy;
+    renderer->QueueCopyEx = PSL1GHT_QueueCopyEx;
+    renderer->RunCommandQueue = PSL1GHT_RunCommandQueue;
     renderer->RenderReadPixels = PSL1GHT_RenderReadPixels;
     renderer->RenderPresent = PSL1GHT_RenderPresent;
+    renderer->DestroyTexture = PSL1GHT_DestroyTexture;
     renderer->DestroyRenderer = PSL1GHT_DestroyRenderer;
     renderer->info = PSL1GHT_RenderDriver.info;
+    renderer->info.flags = (SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
     renderer->driverdata = data;
+    renderer->window = window;
 
     PSL1GHT_UpdateViewport(renderer);
     PSL1GHT_ActivateRenderer(renderer);
     
     return renderer;
+}
+
+static void
+PSL1GHT_WindowEvent(SDL_Renderer * renderer, const SDL_WindowEvent *event)
+{
+}
+
+static SDL_bool
+PSL1GHT_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode)
+{
+    return SDL_FALSE;
 }
 
 static int
@@ -253,28 +290,6 @@ PSL1GHT_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 }
 
 static int
-PSL1GHT_SetTextureColorMod(SDL_Renderer * renderer, SDL_Texture * texture)
-{
-    SDL_Surface *surface = (SDL_Surface *) texture->driverdata;
-    return SDL_SetSurfaceColorMod(surface, texture->r, texture->g,
-                                  texture->b);
-}
-
-static int
-PSL1GHT_SetTextureAlphaMod(SDL_Renderer * renderer, SDL_Texture * texture)
-{
-    SDL_Surface *surface = (SDL_Surface *) texture->driverdata;
-    return SDL_SetSurfaceAlphaMod(surface, texture->a);
-}
-
-static int
-PSL1GHT_SetTextureBlendMode(SDL_Renderer * renderer, SDL_Texture * texture)
-{
-    SDL_Surface *surface = (SDL_Surface *) texture->driverdata;
-    return SDL_SetSurfaceBlendMode(surface, texture->blendMode);
-}
-
-static int
 PSL1GHT_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                  const SDL_Rect * rect, const void *pixels, int pitch)
 {
@@ -296,6 +311,16 @@ PSL1GHT_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
     return 0;
 }
 
+static int 
+PSL1GHT_UpdateTextureYUV(SDL_Renderer * renderer, SDL_Texture * texture,
+                     const SDL_Rect * rect,
+                     const Uint8 *Yplane, int Ypitch,
+                     const Uint8 *Uplane, int Upitch,
+                     const Uint8 *Vplane, int Vpitch)
+{
+    return 0;
+}
+
 static int
 PSL1GHT_LockTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                const SDL_Rect * rect, void **pixels, int *pitch)
@@ -312,6 +337,30 @@ PSL1GHT_LockTexture(SDL_Renderer * renderer, SDL_Texture * texture,
 static void
 PSL1GHT_UnlockTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 {
+}
+
+static int 
+PSL1GHT_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture)
+{
+    return 0;
+}
+
+static int
+PSL1GHT_QueueSetViewport(SDL_Renderer * renderer, SDL_RenderCommand *cmd)
+{
+    return 0;
+}
+
+static int
+PSL1GHT_QueueSetDrawColor(SDL_Renderer * renderer, SDL_RenderCommand *cmd)
+{
+    return 0;
+}
+
+static void
+PSL1GHT_SetTextureScaleMode(SDL_Renderer * renderer, SDL_Texture * texture, SDL_ScaleMode scaleMode)
+{
+    
 }
 
 static int
@@ -358,6 +407,23 @@ PSL1GHT_RenderClear(SDL_Renderer * renderer)
     SDL_SetClipRect(surface, NULL);
     SDL_FillRect(surface, NULL, color);
     SDL_SetClipRect(surface, &clip_rect);
+    return 0;
+}
+
+static int
+PSL1GHT_QueueDrawPoints(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FPoint * points, int count)
+{
+    const size_t vertlen = sizeof(SDL_Point) * count;
+    SDL_Point *verts = (SDL_Point *) SDL_AllocateRenderVertices(renderer, vertlen, 0, &cmd->data.draw.first);
+    if (!verts) {
+        return -1;
+    }
+    cmd->data.draw.count = count;
+    for (int i = 0; i < count; ++i)
+    {
+        verts[i].x = points[i].x;
+        verts[i].y = points[i].y;
+    }
     return 0;
 }
 
@@ -451,6 +517,29 @@ PSL1GHT_RenderDrawLines(SDL_Renderer * renderer, const SDL_Point * points,
     return status;
 }
 
+static int 
+PSL1GHT_QueueFillRects(SDL_Renderer * renderer, SDL_RenderCommand *cmd, const SDL_FRect * rects, int count)
+{
+    const size_t outLen = count * sizeof (SDL_Rect);
+    SDL_Rect *outRects = (SDL_Rect *) SDL_AllocateRenderVertices(renderer, outLen, 0, &cmd->data.draw.first);
+    
+    if (!outRects) {
+        return -1;
+    }
+    cmd->data.draw.count = count;
+    for (int i = 0; i < count; ++i)
+    {
+        outRects[i].x = rects[i].x;
+        outRects[i].y = rects[i].y;
+        outRects[i].w = rects[i].w;
+        outRects[i].h = rects[i].h;
+    }
+    
+    SDL_memcpy(outRects, rects, outLen);
+
+    return 0;
+}
+
 static int
 PSL1GHT_RenderFillRects(SDL_Renderer * renderer, const SDL_Rect * rects, int count)
 {
@@ -493,6 +582,28 @@ PSL1GHT_RenderFillRects(SDL_Renderer * renderer, const SDL_Rect * rects, int cou
         SDL_stack_free(temp);
     }
     return status;
+}
+
+static int 
+PSL1GHT_QueueCopy(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * texture,
+                const SDL_Rect * srcrect, const SDL_FRect * dstrect)
+{
+    const size_t outLen = sizeof (PSL1GHT_CopyData);
+    PSL1GHT_CopyData *outData = (PSL1GHT_CopyData *) SDL_AllocateRenderVertices(renderer, outLen, 0, &cmd->data.draw.first);
+    
+    if (!outData) {
+        return -1;
+    }
+    cmd->data.draw.count = 1;
+    
+    SDL_memcpy(&outData->srcRect, srcrect, sizeof(SDL_Rect));
+    
+    outData->dstRect.x = dstrect->x;
+    outData->dstRect.y = dstrect->y;
+    outData->dstRect.w = dstrect->w;
+    outData->dstRect.h = dstrect->h;
+
+    return 0;
 }
 
 static int
@@ -555,6 +666,84 @@ PSL1GHT_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
 }
 
 static int
+PSL1GHT_QueueCopyEx(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * texture,
+                const SDL_Rect * srcquad, const SDL_FRect * dstrect,
+                const double angle, const SDL_FPoint *center, const SDL_RendererFlip flip)
+{
+    return 0;
+}
+
+static int
+PSL1GHT_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertices, size_t vertsize)
+{
+    while (cmd) {
+        switch (cmd->command) {
+            case SDL_RENDERCMD_SETDRAWCOLOR: {
+                break;
+            }
+
+            case SDL_RENDERCMD_SETVIEWPORT: {
+                break;
+            }
+
+            case SDL_RENDERCMD_SETCLIPRECT: {
+                break;
+            }
+
+            case SDL_RENDERCMD_CLEAR: {
+                PSL1GHT_RenderClear(renderer);
+                break;
+            }
+
+            case SDL_RENDERCMD_DRAW_POINTS: {
+                const size_t count = cmd->data.draw.count;
+                const size_t first = cmd->data.draw.first;
+                const SDL_Point *points = (SDL_Point *) (((Uint8 *) vertices) + first);
+                PSL1GHT_RenderDrawPoints(renderer, points, count);
+                break;
+            }
+
+            case SDL_RENDERCMD_DRAW_LINES: {
+                const size_t count = cmd->data.draw.count;
+                const size_t first = cmd->data.draw.first;
+                const SDL_Point *points = (SDL_Point *) (((Uint8 *) vertices) + first);
+
+                PSL1GHT_RenderDrawLines(renderer, points, count);
+                break;
+            }
+
+            case SDL_RENDERCMD_FILL_RECTS: {
+                const size_t count = cmd->data.draw.count;
+                const size_t first = cmd->data.draw.first;
+                const SDL_Rect *rects = (SDL_Rect *) (((Uint8 *) vertices) + first);
+
+                PSL1GHT_RenderFillRects(renderer, rects, count);
+                break;
+            }
+
+            case SDL_RENDERCMD_COPY: {
+                const size_t first = cmd->data.draw.first;
+                const PSL1GHT_CopyData *copyData = (PSL1GHT_CopyData *) (((Uint8 *) vertices) + first);
+
+                PSL1GHT_RenderCopy(renderer, cmd->data.draw.texture, &copyData->srcRect, &copyData->dstRect);
+                break;
+            }
+
+            case SDL_RENDERCMD_COPY_EX: {
+                break;
+            }
+
+            case SDL_RENDERCMD_NO_OP:
+                break;
+        }
+
+        cmd = cmd->next;
+    }
+
+    return 0;
+}
+
+static int
 PSL1GHT_RenderReadPixels(SDL_Renderer * renderer, const SDL_Rect * rect,
                     Uint32 format, void * pixels, int pitch)
 {
@@ -596,15 +785,17 @@ PSL1GHT_RenderPresent(SDL_Renderer * renderer)
 {
     PSL1GHT_RenderData *data = (PSL1GHT_RenderData *) renderer->driverdata;
 
-    if (!data->first_fb)
-        waitFlip();
-    else
+    if (data->first_fb)
+    {
         gcmResetFlipStatus();
+    }
 
     gcmSetFlip(data->context, data->current_screen);
     rsxFlushBuffer(data->context);
 
     gcmSetWaitFlip(data->context);
+
+    waitFlip();
 
     data->first_fb = false;
 
